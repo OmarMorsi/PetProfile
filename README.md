@@ -13,12 +13,14 @@ Modify the pet profile screen to include:
      - Each log should show:
        - Weight value (in kg)
        - Date of measurement
+     - Include an "Add new weight log" button at the bottom
   
   2. **Body Condition Tab**
      - Display body condition assessments
      - Each log should show:
        - Body condition description (single word/phrase)
        - Date of assessment
+     - Include an "Add new body conditions" button at the bottom
   
   3. **Vet Visits Tab**
      - Display veterinary visit records
