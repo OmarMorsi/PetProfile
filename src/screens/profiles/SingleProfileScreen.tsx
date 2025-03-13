@@ -1,194 +1,172 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Alert,
-  Button,
+  Image,
 } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Pet, BodyConditionLog, WeightLog } from "../../../types";
+import { useFocusEffect } from "@react-navigation/native";
+import { FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import supabase from "../../utils/supabase";
-import { petService } from "@/src/services/petService";
 
-type RootStackParamList = {
-  SingleProfile: { id: string };
-};
+export const SingleProfileScreen = () => {
+  const petId = "3527e9c9-ace3-4fbe-9dea-34d23c074256";
 
-type Props = NativeStackScreenProps<RootStackParamList, "SingleProfile">;
-
-// Mock data for development
-const mockPet: Pet = {
-  id: "1",
-  name: "Max",
-  species: "Dog",
-  breed: "Golden Retriever",
-  age: 3,
-  created_at: new Date().toISOString(),
-  owner_id: "123",
-  logs_weight: [
-    { id: "1", pet_id: "1", weight: 25.5, date: "2024-02-25T10:00:00Z" },
-    { id: "2", pet_id: "1", weight: 26.0, date: "2024-01-25T10:00:00Z" },
-  ],
-  logs_bodycondition: [
-    { id: "1", pet_id: "1", body_condition: "3", date: "2024-02-25T10:00:00Z" },
-    { id: "2", pet_id: "1", body_condition: "4", date: "2024-01-25T10:00:00Z" },
-  ],
-  logs_vet_visits: [],
-};
-
-function getThisMonthLogs(
-  logs_bodycondition: BodyConditionLog[],
-  logs_weight: WeightLog[]
-) {
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-
-  const latestBodyConditionLog = logs_bodycondition
-    .filter(
-      (log) =>
-        new Date(log.date).getMonth() === currentMonth &&
-        new Date(log.date).getFullYear() === currentYear
-    )
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-
-  const latestWeightLog = logs_weight
-    .filter(
-      (log) =>
-        new Date(log.date).getMonth() === currentMonth &&
-        new Date(log.date).getFullYear() === currentYear
-    )
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-
-  return { latestBodyConditionLog, latestWeightLog };
-}
-
-const PetCard = ({ pet }: { pet: Pet }) => (
-  <View style={styles.card}>
-    <Text style={styles.name}>{pet.name}</Text>
-    <Text>Species: {pet.species}</Text>
-    <Text>Age: {pet.age} years</Text>
-  </View>
-);
-
-const LogsTable = ({
-  weightLogs,
-  bodyConditionLogs,
-}: {
-  weightLogs: WeightLog[];
-  bodyConditionLogs: BodyConditionLog[];
-}) => (
-  <View style={styles.table}>
-    <Text style={styles.tableHeader}>Recent Logs</Text>
-    {weightLogs.map((log, index) => (
-      <View key={index} style={styles.tableRow}>
-        <Text>Weight: {log.weight}kg</Text>
-        <Text>Date: {new Date(log.date).toLocaleDateString()}</Text>
-      </View>
-    ))}
-  </View>
-);
-
-const HealthStatus = ({ pet }: { pet: Pet }) => (
-  <View style={styles.healthStatus}>
-    <Text style={styles.tableHeader}>Health Status</Text>
-    <Text>
-      Overall Health: {pet?.logs_weight.length > 3 ? "Good" : "Needs More Data"}
-    </Text>
-    <Text>Last Vet Visit: 2 months ago</Text>
-  </View>
-);
-
-export const SingleProfileScreen: React.FC<Props> = ({ route }) => {
-  const { id } = route.params;
-  const [pet, setPet] = useState<Pet | null>(null);
+  const [pet, setPet] = useState(null);
+  const [latestWeight, setLatestWeight] = useState(null);
+  const [vetVisitLogs, setVetVisitLogs] = useState(null);
+  const [bodyConditionLogs, setBodyConditionLogs] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [thisMonthLogs, setThisMonthLogs] = useState<{
-    latestBodyConditionLog: BodyConditionLog | null;
-    latestWeightLog: WeightLog | null;
-  }>({
-    latestBodyConditionLog: null,
-    latestWeightLog: null,
-  });
 
-  useEffect(() => {
-    const fetchPet = async () => {
-      try {
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        setPet(mockPet);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchPetDetails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("pets")
+        .select("*")
+        .eq("id", petId)
+        .single();
 
-    fetchPet();
-  }, [id]);
-
-  useEffect(() => {
-    if (pet) {
-      setThisMonthLogs(
-        getThisMonthLogs(pet.logs_bodycondition, pet.logs_weight)
-      );
+      if (error) throw error;
+      setPet(data);
+    } catch (error) {
+      console.error("Error fetching pet:", error);
     }
-  }, [pet]);
+  };
+
+  const fetchLatestWeightLog = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("weight_logs")
+        .select("weight, date")
+        .eq("pet_id", petId)
+        .order("date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && data) setLatestWeight(data.weight);
+    } catch (error) {
+      console.error("Error fetching weight log:", error);
+    }
+  };
+
+  const fetchLatestVetVisitLog = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("vet_visit_logs")
+        .select("notes, date")
+        .eq("pet_id", petId)
+        .order("date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!error) setVetVisitLogs(data);
+    } catch (error) {
+      console.error("Error fetching latest vet visit log:", error);
+    }
+  };
+
+  const fetchLatestBodyConditionLog = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("body_condition_logs")
+        .select("body_condition, date")
+        .eq("pet_id", petId)
+        .order("date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!error) setBodyConditionLogs(data);
+    } catch (error) {
+      console.error("Error fetching latest body condition log:", error);
+    }
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    await fetchPetDetails();
+    await fetchLatestWeightLog();
+    await fetchLatestVetVisitLog();
+    await fetchLatestBodyConditionLog();
+    setLoading(false);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
 
   if (loading) {
-    return <ActivityIndicator style={styles.loader} />;
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#FF9800" />
+      </View>
+    );
   }
 
   if (!pet) {
     return (
       <View style={styles.container}>
-        <Text>Pet not found</Text>
+        <Text style={styles.noDataText}>No pets found</Text>
       </View>
     );
   }
 
-  const handleAddPet = async () => {
-    try {
-      console.log("🚀 Adding new pet...");
-
-      const newPet = await petService.createPet({
-        name: "Test", // Change name as needed
-        species: "Cat",
-        breed: "Cherazi",
-        age: 13,
-        owner_id: "44707253-a5a2-4b19-8899-1d4760b30564", // Replace with actual owner_id
-      });
-
-      console.log("✅ New pet added:", newPet);
-      Alert.alert("Success", `New pet added: ${newPet.name}`);
-    } catch (error) {
-      console.error("❌ Error adding pet:", error);
-      Alert.alert("Error", error.message);
-    }
-  };
-
   return (
     <ScrollView style={styles.container}>
-      <PetCard pet={pet} />
+      <View style={styles.profileCard}>
+        <Image
+          source={{
+            uri: pet.image_url || "https://placedog.net/800/300",
+          }}
+          style={styles.petImage}
+        />
+        <Text style={styles.petName}>{pet.name}</Text>
+        <Text style={styles.petDetails}>Species: {pet.species}</Text>
+        <Text style={styles.petDetails}>Age: {pet.age} years</Text>
+      </View>
 
-      <View style={styles.monthSummary}>
-        <Text style={styles.tableHeader}>This Month's Summary</Text>
-        <Text>
-          Latest Weight: {thisMonthLogs.latestWeightLog?.weight || "No data"} kg
-        </Text>
-        <Text>
-          Body Condition:{" "}
-          {thisMonthLogs.latestBodyConditionLog?.body_condition || "No data"}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <FontAwesome5 name="weight" size={20} color="#FF9800" />
+          <Text style={styles.header}>Latest Weight</Text>
+        </View>
+        <Text style={styles.dataText}>
+          {latestWeight !== null ? `${latestWeight} kg` : "No data available"}
         </Text>
       </View>
 
-      <HealthStatus pet={pet} />
-      <Button title="Add New Pet" onPress={handleAddPet} />
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <MaterialIcons name="medical-services" size={22} color="#FF9800" />
+          <Text style={styles.header}>Latest Vet Visit</Text>
+        </View>
+        {vetVisitLogs ? (
+          <Text style={styles.dataText}>
+            {vetVisitLogs.notes} -{" "}
+            {new Date(vetVisitLogs.date).toLocaleDateString()}
+          </Text>
+        ) : (
+          <Text style={styles.noDataText}>No vet visit records found</Text>
+        )}
+      </View>
 
-      <LogsTable
-        weightLogs={pet.logs_weight}
-        bodyConditionLogs={pet.logs_bodycondition}
-      />
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <FontAwesome5 name="heartbeat" size={20} color="#FF9800" />
+          <Text style={styles.header}>Latest Body Condition</Text>
+        </View>
+        {bodyConditionLogs ? (
+          <Text style={styles.dataText}>
+            {bodyConditionLogs.body_condition} -{" "}
+            {new Date(bodyConditionLogs.date).toLocaleDateString()}
+          </Text>
+        ) : (
+          <Text style={styles.noDataText}>No body condition records found</Text>
+        )}
+      </View>
     </ScrollView>
   );
 };
@@ -196,50 +174,72 @@ export const SingleProfileScreen: React.FC<Props> = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#FFF3E0",
     padding: 16,
-    backgroundColor: "#fff",
   },
-  loader: {
+  loaderContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  card: {
-    padding: 16,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 8,
-    marginBottom: 16,
+  profileCard: {
+    backgroundColor: "#FF9800",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+    marginBottom: 20,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
-  name: {
+  petImage: {
+    width: "100%",
+    height: 180,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  petName: {
     fontSize: 24,
     fontWeight: "bold",
+    color: "#FFF",
+  },
+  petDetails: {
+    fontSize: 16,
+    color: "#FFF",
+  },
+  section: {
+    backgroundColor: "#FFF",
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 15,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
-  table: {
-    marginTop: 16,
-  },
-  tableHeader: {
+  header: {
     fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 8,
+    marginLeft: 8,
+    color: "#FF9800",
   },
-  tableRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+  dataText: {
+    fontSize: 16,
+    color: "#333",
   },
-  monthSummary: {
-    padding: 16,
-    backgroundColor: "#e6f3ff",
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  healthStatus: {
-    padding: 16,
-    backgroundColor: "#f0fff0",
-    borderRadius: 8,
-    marginBottom: 16,
+  noDataText: {
+    fontSize: 16,
+    color: "#777",
+    fontStyle: "italic",
   },
 });
+
+export default SingleProfileScreen;

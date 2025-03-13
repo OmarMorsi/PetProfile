@@ -4,7 +4,11 @@ import { Pet } from "../types";
 export const petService = {
   async getPets(): Promise<Pet[]> {
     const { data, error } = await supabase.from("pets").select("*");
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("Error fetching pets:", error.message);
+      throw new Error(error.message);
+    }
+    console.log("Fetched pets:", data);
     return data;
   },
 
@@ -14,7 +18,12 @@ export const petService = {
       .select("*")
       .eq("id", id)
       .single();
-    if (error) return null;
+
+    if (error) {
+      console.error("Error fetching pet by ID:", error.message);
+      return null;
+    }
+    console.log("Fetched pet by ID:", data);
     return data;
   },
 
@@ -25,9 +34,9 @@ export const petService = {
         {
           name: pet.name,
           species: pet.species,
-          breed: pet.breed || null, // Optional field
+          breed: pet.breed || null,
           age: pet.age,
-          owner_id: pet.owner_id, // Required field
+          owner_id: pet.owner_id,
         },
       ])
       .select()
