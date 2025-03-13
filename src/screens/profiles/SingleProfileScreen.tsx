@@ -1,41 +1,48 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-} from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Pet, BodyConditionLog, WeightLog } from '../../types';
+  Alert,
+  Button,
+} from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { Pet, BodyConditionLog, WeightLog } from "../../../types";
+import supabase from "../../utils/supabase";
+import { petService } from "@/src/services/petService";
 
 type RootStackParamList = {
   SingleProfile: { id: string };
 };
 
-type Props = NativeStackScreenProps<RootStackParamList, 'SingleProfile'>;
+type Props = NativeStackScreenProps<RootStackParamList, "SingleProfile">;
 
 // Mock data for development
 const mockPet: Pet = {
-  id: '1',
-  name: 'Max',
-  species: 'Dog',
-  breed: 'Golden Retriever',
+  id: "1",
+  name: "Max",
+  species: "Dog",
+  breed: "Golden Retriever",
   age: 3,
   created_at: new Date().toISOString(),
-  owner_id: '123',
+  owner_id: "123",
   logs_weight: [
-    { id: '1', pet_id: '1', weight: 25.5, date: '2024-02-25T10:00:00Z' },
-    { id: '2', pet_id: '1', weight: 26.0, date: '2024-01-25T10:00:00Z' },
+    { id: "1", pet_id: "1", weight: 25.5, date: "2024-02-25T10:00:00Z" },
+    { id: "2", pet_id: "1", weight: 26.0, date: "2024-01-25T10:00:00Z" },
   ],
   logs_bodycondition: [
-    { id: '1', pet_id: '1', body_condition: "3", date: '2024-02-25T10:00:00Z' },
-    { id: '2', pet_id: '1', body_condition: "4", date: '2024-01-25T10:00:00Z' },
+    { id: "1", pet_id: "1", body_condition: "3", date: "2024-02-25T10:00:00Z" },
+    { id: "2", pet_id: "1", body_condition: "4", date: "2024-01-25T10:00:00Z" },
   ],
   logs_vet_visits: [],
 };
 
-function getThisMonthLogs(logs_bodycondition: BodyConditionLog[], logs_weight: WeightLog[]) {
+function getThisMonthLogs(
+  logs_bodycondition: BodyConditionLog[],
+  logs_weight: WeightLog[]
+) {
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
 
@@ -66,12 +73,12 @@ const PetCard = ({ pet }: { pet: Pet }) => (
   </View>
 );
 
-const LogsTable = ({ 
-  weightLogs, 
-  bodyConditionLogs 
-}: { 
-  weightLogs: WeightLog[], 
-  bodyConditionLogs: BodyConditionLog[] 
+const LogsTable = ({
+  weightLogs,
+  bodyConditionLogs,
+}: {
+  weightLogs: WeightLog[];
+  bodyConditionLogs: BodyConditionLog[];
 }) => (
   <View style={styles.table}>
     <Text style={styles.tableHeader}>Recent Logs</Text>
@@ -87,7 +94,9 @@ const LogsTable = ({
 const HealthStatus = ({ pet }: { pet: Pet }) => (
   <View style={styles.healthStatus}>
     <Text style={styles.tableHeader}>Health Status</Text>
-    <Text>Overall Health: {pet?.logs_weight.length > 3 ? 'Good' : 'Needs More Data'}</Text>
+    <Text>
+      Overall Health: {pet?.logs_weight.length > 3 ? "Good" : "Needs More Data"}
+    </Text>
     <Text>Last Vet Visit: 2 months ago</Text>
   </View>
 );
@@ -108,7 +117,7 @@ export const SingleProfileScreen: React.FC<Props> = ({ route }) => {
     const fetchPet = async () => {
       try {
         // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         setPet(mockPet);
       } finally {
         setLoading(false);
@@ -120,7 +129,9 @@ export const SingleProfileScreen: React.FC<Props> = ({ route }) => {
 
   useEffect(() => {
     if (pet) {
-      setThisMonthLogs(getThisMonthLogs(pet.logs_bodycondition, pet.logs_weight));
+      setThisMonthLogs(
+        getThisMonthLogs(pet.logs_bodycondition, pet.logs_weight)
+      );
     }
   }, [pet]);
 
@@ -136,25 +147,47 @@ export const SingleProfileScreen: React.FC<Props> = ({ route }) => {
     );
   }
 
+  const handleAddPet = async () => {
+    try {
+      console.log("🚀 Adding new pet...");
+
+      const newPet = await petService.createPet({
+        name: "Test", // Change name as needed
+        species: "Cat",
+        breed: "Cherazi",
+        age: 13,
+        owner_id: "44707253-a5a2-4b19-8899-1d4760b30564", // Replace with actual owner_id
+      });
+
+      console.log("✅ New pet added:", newPet);
+      Alert.alert("Success", `New pet added: ${newPet.name}`);
+    } catch (error) {
+      console.error("❌ Error adding pet:", error);
+      Alert.alert("Error", error.message);
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <PetCard pet={pet} />
-      
+
       <View style={styles.monthSummary}>
         <Text style={styles.tableHeader}>This Month's Summary</Text>
         <Text>
-          Latest Weight: {thisMonthLogs.latestWeightLog?.weight || 'No data'} kg
+          Latest Weight: {thisMonthLogs.latestWeightLog?.weight || "No data"} kg
         </Text>
         <Text>
-          Body Condition: {thisMonthLogs.latestBodyConditionLog?.body_condition || 'No data'}
+          Body Condition:{" "}
+          {thisMonthLogs.latestBodyConditionLog?.body_condition || "No data"}
         </Text>
       </View>
 
       <HealthStatus pet={pet} />
-      
-      <LogsTable 
-        weightLogs={pet.logs_weight} 
-        bodyConditionLogs={pet.logs_bodycondition} 
+      <Button title="Add New Pet" onPress={handleAddPet} />
+
+      <LogsTable
+        weightLogs={pet.logs_weight}
+        bodyConditionLogs={pet.logs_bodycondition}
       />
     </ScrollView>
   );
@@ -164,22 +197,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   loader: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   card: {
     padding: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
     borderRadius: 8,
     marginBottom: 16,
   },
   name: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 8,
   },
   table: {
@@ -187,26 +220,26 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 8,
   },
   tableRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     padding: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   monthSummary: {
     padding: 16,
-    backgroundColor: '#e6f3ff',
+    backgroundColor: "#e6f3ff",
     borderRadius: 8,
     marginBottom: 16,
   },
   healthStatus: {
     padding: 16,
-    backgroundColor: '#f0fff0',
+    backgroundColor: "#f0fff0",
     borderRadius: 8,
     marginBottom: 16,
   },
-}); 
+});
